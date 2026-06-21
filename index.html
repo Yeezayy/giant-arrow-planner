@@ -381,19 +381,50 @@ function computeDeployPoints() {
   ts.sort((a, b) => a - b);
   const tMin = ts[0], tMax = ts[ts.length - 1];
   const a = state.traj.anchor;
-  const pA = { x: a.x + d.x * tMin, y: a.y + d.y * tMin };
-  const pB = { x: a.x + d.x * tMax, y: a.y + d.y * tMax };
-  // La Reine déployée en pA tire vers l'intérieur => direction +d.
-  // En pB elle tire vers -d.
-  return [
-    { pt: pA, label: "A", angleDeg: normDeg(toDeg(state.traj.angle)) },
-    { pt: pB, label: "B", angleDeg: normDeg(toDeg(state.traj.angle) + 180) },
-  ];
+  const center = baseCentroid();
+  const offset = Math.max(25, baseSpan() * 0.12); // recul vers l'extérieur de la base
+
+  // Construit un point de déploiement à partir du paramètre t.
+  // intoSign = sens de tir vers l'intérieur de la base (+d ou -d).
+  function make(t, label, intoSign) {
+    const edge = { x: a.x + d.x * t, y: a.y + d.y * t };       // bord de la base
+    const fire = { x: d.x * intoSign, y: d.y * intoSign };      // direction de tir (unitaire)
+    const drop = { x: edge.x - fire.x * offset, y: edge.y - fire.y * offset }; // hors base
+    const loc = center ? { x: edge.x - center.x, y: edge.y - center.y } : fire;
+    return {
+      label, edge, drop, fire,
+      angleDeg: normDeg(toDeg(Math.atan2(fire.y, fire.x))),
+      side: compass8(loc.x, loc.y),     // où se place la Reine, par rapport au centre
+      aim:  compass8(fire.x, fire.y),   // direction visée
+    };
+  }
+  // Reine en tMin tire vers +d ; en tMax vers -d.
+  return [ make(tMin, "A", +1), make(tMax, "B", -1) ];
 }
 
 function toDeg(rad) { return rad * 180 / Math.PI; }
 function toRad(deg) { return deg * Math.PI / 180; }
 function normDeg(d) { return ((d % 360) + 360) % 360; }
+
+// Centre approximatif de la base (moyenne des sommets du contour).
+function baseCentroid() {
+  if (state.contour.length === 0) return null;
+  const s = state.contour.reduce((a, p) => ({ x: a.x + p.x, y: a.y + p.y }), { x: 0, y: 0 });
+  return { x: s.x / state.contour.length, y: s.y / state.contour.length };
+}
+// Taille caractéristique de la base (diagonale de sa boîte englobante).
+function baseSpan() {
+  if (state.contour.length === 0) return 200;
+  const xs = state.contour.map(p => p.x), ys = state.contour.map(p => p.y);
+  return Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+}
+// Vecteur -> point cardinal (8 directions). En coords image, y croît vers le bas,
+// donc le Nord = -y. atan2(vx, -vy) donne un cap horaire depuis le Nord.
+function compass8(vx, vy) {
+  const a = (Math.atan2(vx, -vy) * 180 / Math.PI + 360) % 360;
+  const names = ["Nord", "Nord-Est", "Est", "Sud-Est", "Sud", "Sud-Ouest", "Ouest", "Nord-Ouest"];
+  return names[Math.round(a / 45) % 8];
+}
 
 // --- Grille de calibration (interpolation bilinéaire) ---
 // corners = [TL, TR, BR, BL] en coords MONDE, correspondant aux coins de la
@@ -546,17 +577,55 @@ function drawTrajectory() {
   ctx.stroke();
   ctx.restore();
 
-  // -- Points de déploiement --
+  // -- Points de déploiement de la Reine (où taper + direction de tir) --
   computeDeployPoints().forEach(dp => {
-    const s = worldToScreen(dp.pt.x, dp.pt.y);
+    const sDrop = worldToScreen(dp.drop.x, dp.drop.y);     // où déposer la Reine
+    const fire = dp.fire;
+    // longueur de flèche directionnelle proportionnelle à la base
+    const arrowLen = Math.max(40, baseSpan() * 0.10) * state.view.scale;
+    const tip = { x: sDrop.x + fire.x * arrowLen, y: sDrop.y + fire.y * arrowLen };
     ctx.save();
-    ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, TAU);
+
+    // flèche directionnelle (du point de drop vers l'intérieur)
+    ctx.strokeStyle = "#3fb950"; ctx.fillStyle = "#3fb950"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(sDrop.x, sDrop.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
+    // pointe de flèche
+    const ah = 10, ang = Math.atan2(fire.y, fire.x);
+    ctx.beginPath();
+    ctx.moveTo(tip.x, tip.y);
+    ctx.lineTo(tip.x - ah * Math.cos(ang - 0.4), tip.y - ah * Math.sin(ang - 0.4));
+    ctx.lineTo(tip.x - ah * Math.cos(ang + 0.4), tip.y - ah * Math.sin(ang + 0.4));
+    ctx.closePath(); ctx.fill();
+
+    // pastille de drop (👑)
+    ctx.beginPath(); ctx.arc(sDrop.x, sDrop.y, 15, 0, TAU);
     ctx.fillStyle = "#3fb950"; ctx.fill();
-    ctx.strokeStyle = "#04130a"; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = "#04130a"; ctx.font = "bold 11px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(dp.label, s.x, s.y);
+    ctx.strokeStyle = "#04130a"; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.font = "15px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("👑", sDrop.x, sDrop.y + 1);
+
+    // étiquette "Reine A / Reine B"
+    ctx.fillStyle = "#04130a"; ctx.strokeStyle = "#3fb950"; ctx.lineWidth = 0;
+    ctx.font = "bold 11px system-ui";
+    const lbl = "Reine " + dp.label;
+    const tw = ctx.measureText(lbl).width + 10;
+    ctx.fillStyle = "#3fb950";
+    roundRect(ctx, sDrop.x - tw / 2, sDrop.y - 34, tw, 16, 4); ctx.fill();
+    ctx.fillStyle = "#04130a";
+    ctx.fillText(lbl, sDrop.x, sDrop.y - 26);
     ctx.restore();
   });
+}
+
+// petit utilitaire : rectangle à coins arrondis
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 function drawMarkers() {
@@ -896,10 +965,10 @@ function refreshDeploy() {
   }
   box.innerHTML = dps.map(dp => `
     <div class="deploy">
-      <b>Déployer côté ${dp.label}</b><br>
-      Position (px image) : ${dp.pt.x.toFixed(0)}, ${dp.pt.y.toFixed(0)}<br>
-      Angle de tir : <b>${dp.angleDeg.toFixed(0)}°</b>
-    </div>`).join("");
+      <b>👑 Reine ${dp.label}</b> — déploie-la au <b>${dp.side}</b> de la base<br>
+      Vise vers le <b>${dp.aim}</b> (angle ${dp.angleDeg.toFixed(0)}°)
+    </div>`).join("") +
+    `<div class="score-sub" style="margin-top:6px">Les deux côtés touchent les mêmes bâtiments : choisis le côté le plus dégagé (peu de défenses près du drop).</div>`;
 }
 function refreshMarkerList() {
   document.getElementById("markerCount").textContent = state.markers.length;
