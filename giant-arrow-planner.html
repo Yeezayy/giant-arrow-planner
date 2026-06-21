@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Planificateur de Flèche Géante — Clash of Clans</title>
+<style>
+  /* ===========================================================
+     THÈME SOMBRE "OUTIL TACTIQUE"
+     =========================================================== */
+  :root {
+    --bg:        #0e1116;
+    --panel:     #161b22;
+    --panel-2:   #1c232d;
+    --border:    #2a323d;
+    --text:      #e6edf3;
+    --text-dim:  #8b97a7;
+    --accent:    #3fb950;
+    --accent-2:  #58a6ff;
+    --danger:    #f85149;
+    --warn:      #d29922;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+  }
+  #app { display: flex; flex-direction: column; height: 100%; }
+
+  /* ---------- Barre d'outils ---------- */
+  #toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 8px 10px; background: var(--panel);
+    border-bottom: 1px solid var(--border); flex: 0 0 auto;
+  }
+  #toolbar .group { display: flex; align-items: center; gap: 4px; }
+  #toolbar .sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+  .title { font-weight: 700; margin-right: 6px; letter-spacing: .3px; }
+  .title small { color: var(--text-dim); font-weight: 400; }
+
+  button, .btn {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 11px; cursor: pointer; font-size: 13px;
+    user-select: none; white-space: nowrap;
+  }
+  button:hover, .btn:hover { border-color: var(--accent-2); }
+  button.active { background: var(--accent-2); color: #04101f; border-color: var(--accent-2); font-weight: 600; }
+  button.danger:hover { border-color: var(--danger); color: var(--danger); }
+  label.range { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 12px; }
+  input[type=range] { accent-color: var(--accent-2); cursor: pointer; }
+  input[type=number], select, input[type=text] {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 7px; font-size: 13px;
+  }
+
+  /* ---------- Corps : canvas + panneau ---------- */
+  #body { display: flex; flex: 1 1 auto; min-height: 0; }
+  #canvas-wrap { position: relative; flex: 1 1 auto; min-width: 0; background:
+      repeating-conic-gradient(#0b0e12 0% 25%, #11151b 0% 50%) 50% / 24px 24px; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #hint {
+    position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
+    background: rgba(0,0,0,.6); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 20px; font-size: 12px; color: var(--text-dim);
+    pointer-events: none; max-width: 90%; text-align: center;
+  }
+
+  /* ---------- Panneau latéral droit ---------- */
+  #side {
+    flex: 0 0 320px; width: 320px; background: var(--panel);
+    border-left: 1px solid var(--border); overflow-y: auto; padding: 12px;
+  }
+  .card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 12px; }
+  .card h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-dim); }
+  .score-big { font-size: 30px; font-weight: 800; color: var(--accent); }
+  .score-sub { color: var(--text-dim); font-size: 12px; }
+
+  .hit-list, .marker-list { list-style: none; margin: 0; padding: 0; }
+  .hit-list li, .marker-list li {
+    display: flex; align-items: center; gap: 8px; padding: 5px 4px;
+    border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  .hit-list li:last-child, .marker-list li:last-child { border-bottom: none; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.35); }
+  .grow { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag { font-size: 10px; padding: 1px 5px; border-radius: 4px; background: var(--accent); color: #04130a; font-weight: 700; }
+  .tag.lock { background: var(--warn); color: #1a1305; }
+  .mini { background: transparent; border: none; color: var(--text-dim); padding: 2px 5px; cursor: pointer; font-size: 14px; }
+  .mini:hover { color: var(--danger); }
+  .marker-list select { font-size: 11px; padding: 2px 4px; max-width: 120px; }
+  .marker-list input[type=number] { width: 48px; padding: 2px 4px; }
+
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0; }
+  .row label { color: var(--text-dim); font-size: 12px; }
+  .deploy { background: var(--panel); border: 1px dashed var(--accent); border-radius: 6px; padding: 8px; margin-top: 8px; font-size: 12px; }
+  .deploy b { color: var(--accent); }
+  .empty { color: var(--text-dim); font-style: italic; font-size: 12px; }
+
+  .opt-result { border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin-top: 6px; cursor: pointer; }
+  .opt-result:hover { border-color: var(--accent-2); }
+  .opt-result .big { font-size: 16px; font-weight: 700; color: var(--accent); }
+
+  /* Type-picker pour le marquage courant */
+  #typePicker { display: flex; flex-wrap: wrap; gap: 4px; }
+  #typePicker button { padding: 5px 8px; font-size: 12px; display: flex; align-items: center; gap: 5px; }
+
+  .hidden { display: none !important; }
+  @media (max-width: 720px) {
+    #side { flex-basis: 260px; width: 260px; }
+    .title small { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ======================= BARRE D'OUTILS ======================= -->
+  <div id="toolbar">
+    <span class="title">🏹 Flèche Géante <small>· Planificateur CoC</small></span>
+
+    <div class="group">
+      <button id="btnLoad">📷 Charger image</button>
+      <input id="fileInput" type="file" accept="image/*" class="hidden" />
+    </div>
+
+    <div class="sep"></div>
+
+    <!-- Sélecteur de mode -->
+    <div class="group" id="modeGroup">
+      <button data-mode="nav"     title="Déplacer / zoomer la vue">✋ Naviguer</button>
+      <button data-mode="mark"    title="Poser des marqueurs sur les bâtiments">📍 Marquer</button>
+      <button data-mode="traj"    title="Tracer la trajectoire de la flèche">➡️ Trajectoire</button>
+      <button data-mode="contour" title="Tracer le contour de la base (polygone)">⬡ Contour base</button>
+      <button data-mode="grid"    title="Calibrer une grille 44×44 sur la base">⊞ Grille</button>
+    </div>
+
+    <div class="sep"></div>
+
+    <label class="range">Largeur flèche
+      <input id="width" type="range" min="4" max="200" value="40" />
+      <span id="widthVal">40px</span>
+    </label>
+    <label class="range">Opacité
+      <input id="opacity" type="range" min="5" max="90" value="30" />
+    </label>
+
+    <div class="sep"></div>
+
+    <button id="btnExport">⬇️ Exporter JSON</button>
+    <button id="btnImport">⬆️ Importer</button>
+    <input id="importInput" type="file" accept="application/json,.json" class="hidden" />
+    <button id="btnReset" class="danger">🗑️ Réinitialiser</button>
+  </div>
+
+  <!-- ======================= CORPS ======================= -->
+  <div id="body">
+    <div id="canvas-wrap">
+      <canvas id="cv"></canvas>
+      <div id="hint"></div>
+    </div>
+
+    <!-- ----------- PANNEAU LATÉRAL ----------- -->
+    <div id="side">
+
+      <!-- Score du tir courant -->
+      <div class="card">
+        <h3>Score du tir</h3>
+        <div class="score-big" id="scoreVal">0</div>
+        <div class="score-sub" id="scoreSub">Aucune trajectoire tracée</div>
+      </div>
+
+      <!-- Bâtiments touchés -->
+      <div class="card">
+        <h3>Touchés par la flèche</h3>
+        <ul class="hit-list" id="hitList"><li class="empty">—</li></ul>
+      </div>
+
+      <!-- Points de déploiement -->
+      <div class="card">
+        <h3>Déploiement de la Reine</h3>
+        <div id="deployBox"><span class="empty">Trace un contour de base + une trajectoire.</span></div>
+      </div>
+
+      <!-- Cible verrouillée + optimiseur -->
+      <div class="card">
+        <h3>Cible verrouillée</h3>
+        <div id="lockBox"><span class="empty">Clic droit (ou appui long) sur un marqueur pour le verrouiller.</span></div>
+        <div id="lockControls" class="hidden">
+          <div class="row">
+            <label>Angle de tir</label>
+            <span id="angleVal">0°</span>
+          </div>
+          <input id="angleSlider" type="range" min="0" max="359" value="0" style="width:100%" />
+          <button id="btnOptimize" style="width:100%; margin-top:8px;">✨ Trouver le meilleur tir</button>
+          <div id="optResults"></div>
+        </div>
+      </div>
+
+      <!-- Type courant pour le marquage -->
+      <div class="card">
+        <h3>Type à poser (mode Marquer)</h3>
+        <div id="typePicker"></div>
+      </div>
+
+      <!-- Calibration grille 44×44 (V2.8) -->
+      <div class="card">
+        <h3>Calibration grille</h3>
+        <div class="row">
+          <label>Taille (tuiles)</label>
+          <input id="gridSize" type="number" min="2" max="100" value="44" style="width:64px" />
+        </div>
+        <div id="gridStatus" class="score-sub" style="margin:6px 0">Grille non calibrée.</div>
+        <button id="btnGridMode" style="width:100%; margin-bottom:6px;">⊞ Placer la grille (4 coins)</button>
+        <div class="row">
+          <label><input type="checkbox" id="gridShow" checked /> Afficher la grille</label>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="gridSnap" /> Snap des marqueurs</label>
+        </div>
+        <button id="btnGridResnap" style="width:100%; margin-bottom:6px;">📌 Re-snapper tout</button>
+        <button id="btnGridClear" class="danger" style="width:100%;">✕ Effacer la grille</button>
+      </div>
+
+      <!-- Liste des marqueurs -->
+      <div class="card">
+        <h3>Marqueurs (<span id="markerCount">0</span>)</h3>
+        <ul class="marker-list" id="markerList"><li class="empty">Aucun marqueur</li></ul>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   PLANIFICATEUR DE FLÈCHE GÉANTE — 100% client, sans backend.
+   Tout le calcul se fait en pixels-image (l'iso CoC garde les
+   droites droites à l'écran, cf. cahier des charges).
+   ================================================================ */
+
+// ---------------------------------------------------------------
+// 1. CATALOGUE DES TYPES DE BÂTIMENTS
+//    dmgMult = multiplicateur de dégâts de la Flèche Géante
+//    (×2 sur les Défenses Aériennes).
+// ---------------------------------------------------------------
+const TYPES = {
+  airSweeper:  { label: "Propulseur Aérien", color: "#58a6ff", value: 8, dmgMult: 1 },
+  airDefense:  { label: "Défense Aérienne",  color: "#f778ba", value: 7, dmgMult: 2 },
+  inferno:     { label: "Tour Infernale",    color: "#ff7b35", value: 9, dmgMult: 1 },
+  mortar:      { label: "Mortier",           color: "#d29922", value: 5, dmgMult: 1 },
+  townhall:    { label: "Hôtel de Ville",    color: "#ffd33d", value: 6, dmgMult: 1 },
+  cannon:      { label: "Canon",             color: "#9ea7b3", value: 3, dmgMult: 1 },
+  archerTower: { label: "Tour d'Archers",    color: "#3fb950", value: 3, dmgMult: 1 },
+  other:       { label: "Autre",             color: "#c9d1d9", value: 1, dmgMult: 1 },
+};
+
+// ---------------------------------------------------------------
+// 2. ÉTAT GLOBAL
+// ---------------------------------------------------------------
+const state = {
+  img: null,                       // HTMLImageElement du screenshot
+  markers: [],                     // {id, x, y, type, value}  (coords MONDE = pixels image)
+  contour: [],                     // polygone du contour de base (coords MONDE)
+  contourClosed: false,
+  // Trajectoire : ancre + angle (radians). Permet le mode libre ET le verrouillage.
+  traj: { defined: false, anchor: null, angle: 0 },
+  lockTargetId: null,              // id du marqueur "cible prioritaire"
+  // Grille de calibration (V2.8) : 4 coins définissent un quadrilatère que
+  // l'on mappe par interpolation bilinéaire vers une grille N×N (44×44 par défaut).
+  grid: { corners: [], size: 44, show: true, snap: false },
+  arrowWidth: 40,                  // largeur de bande en pixels MONDE
+  bandOpacity: 0.30,
+  mode: "nav",                     // nav | mark | traj | contour
+  currentType: "airSweeper",
+  // Vue : screenX = worldX * scale + tx
+  view: { scale: 1, tx: 0, ty: 0 },
+  optTop: [],                      // résultats de l'optimiseur
+};
+let nextId = 1;
+
+// ---------------------------------------------------------------
+// 3. RÉFÉRENCES DOM + CANVAS
+// ---------------------------------------------------------------
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const wrap = document.getElementById("canvas-wrap");
+const hintEl = document.getElementById("hint");
+
+function resizeCanvas() {
+  const r = wrap.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(r.width * dpr);
+  cv.height = Math.round(r.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // travaille en pixels CSS
+  draw();
+}
+window.addEventListener("resize", resizeCanvas);
+
+// ---------------------------------------------------------------
+// 4. TRANSFORMATIONS MONDE <-> ÉCRAN
+// ---------------------------------------------------------------
+function worldToScreen(x, y) {
+  return { x: x * state.view.scale + state.view.tx, y: y * state.view.scale + state.view.ty };
+}
+function screenToWorld(x, y) {
+  return { x: (x - state.view.tx) / state.view.scale, y: (y - state.view.ty) / state.view.scale };
+}
+function fitImage() {
+  if (!state.img) return;
+  const r = wrap.getBoundingClientRect();
+  const s = Math.min(r.width / state.img.width, r.height / state.img.height) * 0.95;
+  state.view.scale = s;
+  state.view.tx = (r.width - state.img.width * s) / 2;
+  state.view.ty = (r.height - state.img.height * s) / 2;
+}
+
+// ---------------------------------------------------------------
+// 5. GÉOMÉTRIE
+// ---------------------------------------------------------------
+const TAU = Math.PI * 2;
+function dir(angle) { return { x: Math.cos(angle), y: Math.sin(angle) }; }
+
+// Distance perpendiculaire d'un point P à la droite (anchor, direction unitaire d).
+// = |cross(P - anchor, d)|  (d normalisé)
+function perpDistance(P, anchor, d) {
+  const vx = P.x - anchor.x, vy = P.y - anchor.y;
+  return Math.abs(vx * d.y - vy * d.x);
+}
+// Projection scalaire (position le long de la droite, signée).
+function alongDistance(P, anchor, d) {
+  return (P.x - anchor.x) * d.x + (P.y - anchor.y) * d.y;
+}
+
+// Liste des marqueurs touchés par la bande de la trajectoire courante.
+function computeHits() {
+  if (!state.traj.defined) return [];
+  const d = dir(state.traj.angle);
+  const half = state.arrowWidth / 2;
+  return state.markers
+    .map(m => ({ m, perp: perpDistance(m, state.traj.anchor, d), along: alongDistance(m, state.traj.anchor, d) }))
+    .filter(o => o.perp <= half)
+    .sort((a, b) => a.along - b.along)
+    .map(o => o.m);
+}
+function scoreOf(markers) {
+  return markers.reduce((s, m) => s + m.value * TYPES[m.type].dmgMult, 0);
+}
+
+// Intersection d'une droite infinie (anchor, d) avec un segment [A,B].
+// Renvoie le paramètre t le long de la droite, ou null.
+function lineSegIntersect(anchor, d, A, B) {
+  const ex = B.x - A.x, ey = B.y - A.y;        // direction du segment
+  const denom = d.x * ey - d.y * ex;           // det
+  if (Math.abs(denom) < 1e-9) return null;      // parallèles
+  const wx = A.x - anchor.x, wy = A.y - anchor.y;
+  const t = (wx * ey - wy * ex) / denom;       // distance le long de la droite
+  const u = (wx * d.y - wy * d.x) / denom;     // position sur le segment [0,1]
+  if (u < 0 || u > 1) return null;
+  return t;
+}
+
+// Points où la trajectoire sort du contour de base.
+// Renvoie [ {pt, t, angleInward} , ... ] trié par t (extrémités = min & max).
+function computeDeployPoints() {
+  if (!state.traj.defined || state.contour.length < 2) return [];
+  const d = dir(state.traj.angle);
+  const ts = [];
+  const n = state.contour.length;
+  const edges = state.contourClosed ? n : n - 1;
+  for (let i = 0; i < edges; i++) {
+    const A = state.contour[i];
+    const B = state.contour[(i + 1) % n];
+    const t = lineSegIntersect(state.traj.anchor, d, A, B);
+    if (t !== null) ts.push(t);
+  }
+  if (ts.length < 2) return [];
+  ts.sort((a, b) => a - b);
+  const tMin = ts[0], tMax = ts[ts.length - 1];
+  const a = state.traj.anchor;
+  const pA = { x: a.x + d.x * tMin, y: a.y + d.y * tMin };
+  const pB = { x: a.x + d.x * tMax, y: a.y + d.y * tMax };
+  // La Reine déployée en pA tire vers l'intérieur => direction +d.
+  // En pB elle tire vers -d.
+  return [
+    { pt: pA, label: "A", angleDeg: normDeg(toDeg(state.traj.angle)) },
+    { pt: pB, label: "B", angleDeg: normDeg(toDeg(state.traj.angle) + 180) },
+  ];
+}
+
+function toDeg(rad) { return rad * 180 / Math.PI; }
+function toRad(deg) { return deg * Math.PI / 180; }
+function normDeg(d) { return ((d % 360) + 360) % 360; }
+
+// --- Grille de calibration (interpolation bilinéaire) ---
+// corners = [TL, TR, BR, BL] en coords MONDE, correspondant aux coins de la
+// grille (0,0), (N,0), (N,N), (0,N). (u,v) sont normalisés dans [0,1].
+function gridReady() { return state.grid.corners.length === 4; }
+function gridToWorld(u, v) {
+  const [TL, TR, BR, BL] = state.grid.corners;
+  const top = { x: TL.x + (TR.x - TL.x) * u, y: TL.y + (TR.y - TL.y) * u };
+  const bot = { x: BL.x + (BR.x - BL.x) * u, y: BL.y + (BR.y - BL.y) * u };
+  return { x: top.x + (bot.x - top.x) * v, y: top.y + (bot.y - top.y) * v };
+}
+// Snap d'un point MONDE vers le centre de tuile le plus proche.
+// Recherche par balayage des centres (N×N) : simple et robuste.
+function snapToGrid(P) {
+  if (!gridReady()) return P;
+  const N = state.grid.size;
+  let best = P, bd = Infinity;
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const w = gridToWorld((i + 0.5) / N, (j + 0.5) / N);
+      const dd = (w.x - P.x) ** 2 + (w.y - P.y) ** 2;
+      if (dd < bd) { bd = dd; best = w; }
+    }
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------
+// 6. DESSIN
+// ---------------------------------------------------------------
+function draw() {
+  const r = wrap.getBoundingClientRect();
+  ctx.clearRect(0, 0, r.width, r.height);
+
+  // -- Image de fond --
+  if (state.img) {
+    const tl = worldToScreen(0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(state.img, tl.x, tl.y, state.img.width * state.view.scale, state.img.height * state.view.scale);
+  } else {
+    ctx.fillStyle = "#5a6675";
+    ctx.font = "16px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("Charge un screenshot de base pour commencer →", r.width / 2, r.height / 2);
+    ctx.textAlign = "left";
+    return;
+  }
+
+  drawGrid();
+  drawContour();
+  drawTrajectory();
+  drawMarkers();
+}
+
+function drawGrid() {
+  const c = state.grid.corners;
+  // Coins en cours de placement (avant d'avoir les 4)
+  if (c.length > 0 && c.length < 4) {
+    ctx.save();
+    ctx.fillStyle = "#58a6ff";
+    c.forEach((p, i) => {
+      const s = worldToScreen(p.x, p.y);
+      ctx.beginPath(); ctx.arc(s.x, s.y, 6, 0, TAU); ctx.fill();
+      ctx.fillStyle = "#04101f"; ctx.font = "bold 10px system-ui";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(i + 1, s.x, s.y);
+      ctx.fillStyle = "#58a6ff";
+    });
+    ctx.restore();
+    return;
+  }
+  if (!gridReady() || !state.grid.show) return;
+  const N = state.grid.size;
+  ctx.save();
+  ctx.strokeStyle = "rgba(88, 166, 255, .35)";
+  ctx.lineWidth = 1;
+  // lignes "verticales" (u constant) et "horizontales" (v constant)
+  for (let i = 0; i <= N; i++) {
+    const u = i / N;
+    const a = worldToScreen(...Object.values(gridToWorld(u, 0)));
+    const b = worldToScreen(...Object.values(gridToWorld(u, 1)));
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  for (let j = 0; j <= N; j++) {
+    const v = j / N;
+    const a = worldToScreen(...Object.values(gridToWorld(0, v)));
+    const b = worldToScreen(...Object.values(gridToWorld(1, v)));
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  // bordure marquée + coins déplaçables
+  ctx.strokeStyle = "#58a6ff"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  c.forEach((p, i) => { const s = worldToScreen(p.x, p.y); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y); });
+  ctx.closePath(); ctx.stroke();
+  ctx.fillStyle = "#58a6ff";
+  c.forEach(p => { const s = worldToScreen(p.x, p.y); ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, TAU); ctx.fill(); });
+  ctx.restore();
+}
+
+function drawContour() {
+  if (state.contour.length === 0) return;
+  ctx.save();
+  ctx.beginPath();
+  state.contour.forEach((p, i) => {
+    const s = worldToScreen(p.x, p.y);
+    i === 0 ? ctx.moveTo(s.x, s.y) : ctx.lineTo(s.x, s.y);
+  });
+  if (state.contourClosed) ctx.closePath();
+  ctx.strokeStyle = "#3fb95088";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 6]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (state.contourClosed) { ctx.fillStyle = "#3fb9501a"; ctx.fill(); }
+  // sommets
+  ctx.fillStyle = "#3fb950";
+  state.contour.forEach(p => {
+    const s = worldToScreen(p.x, p.y);
+    ctx.beginPath(); ctx.arc(s.x, s.y, 4, 0, TAU); ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawTrajectory() {
+  if (!state.traj.defined) return;
+  const d = dir(state.traj.angle);
+  const a = state.traj.anchor;
+  const L = 100000; // prolonge "à l'infini" dans les deux sens
+  const p1 = worldToScreen(a.x - d.x * L, a.y - d.y * L);
+  const p2 = worldToScreen(a.x + d.x * L, a.y + d.y * L);
+  const halfPx = (state.arrowWidth / 2) * state.view.scale;
+  // perpendiculaire écran
+  const px = -d.y, py = d.x;
+
+  // -- Bande --
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(p1.x + px * halfPx, p1.y + py * halfPx);
+  ctx.lineTo(p2.x + px * halfPx, p2.y + py * halfPx);
+  ctx.lineTo(p2.x - px * halfPx, p2.y - py * halfPx);
+  ctx.lineTo(p1.x - px * halfPx, p1.y - py * halfPx);
+  ctx.closePath();
+  ctx.fillStyle = `rgba(248, 81, 73, ${state.bandOpacity})`;
+  ctx.fill();
+
+  // -- Axe central --
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+  ctx.strokeStyle = "#f85149"; ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // -- Points de déploiement --
+  computeDeployPoints().forEach(dp => {
+    const s = worldToScreen(dp.pt.x, dp.pt.y);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, TAU);
+    ctx.fillStyle = "#3fb950"; ctx.fill();
+    ctx.strokeStyle = "#04130a"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = "#04130a"; ctx.font = "bold 11px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(dp.label, s.x, s.y);
+    ctx.restore();
+  });
+}
+
+function drawMarkers() {
+  const hits = new Set(computeHits().map(m => m.id));
+  state.markers.forEach(m => {
+    const s = worldToScreen(m.x, m.y);
+    const t = TYPES[m.type];
+    const hit = hits.has(m.id);
+    const locked = m.id === state.lockTargetId;
+    ctx.save();
+    // halo "touché"
+    if (hit) {
+      ctx.beginPath(); ctx.arc(s.x, s.y, 14, 0, TAU);
+      ctx.fillStyle = "rgba(248, 81, 73, .35)"; ctx.fill();
+    }
+    // pastille
+    ctx.beginPath(); ctx.arc(s.x, s.y, 8, 0, TAU);
+    ctx.fillStyle = t.color; ctx.fill();
+    ctx.lineWidth = locked ? 3 : 1.5;
+    ctx.strokeStyle = locked ? "#d29922" : "#000a"; ctx.stroke();
+    // cadenas si verrouillé
+    if (locked) {
+      ctx.fillStyle = "#d29922"; ctx.font = "10px system-ui"; ctx.textAlign = "center";
+      ctx.fillText("🔒", s.x, s.y - 14);
+    }
+    ctx.restore();
+  });
+}
+
+// ---------------------------------------------------------------
+// 7. GESTION DES ENTRÉES (souris + tactile via Pointer Events)
+// ---------------------------------------------------------------
+let pointers = new Map();          // id -> {x,y} pour pinch
+let drag = null;                   // état de glissement courant
+let longPressTimer = null;
+
+function localXY(e) {
+  const r = cv.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+function findMarkerAt(sx, sy, radius = 14) {
+  // renvoie le marqueur le plus proche sous le curseur (coords écran)
+  let best = null, bd = radius;
+  for (const m of state.markers) {
+    const s = worldToScreen(m.x, m.y);
+    const dist = Math.hypot(s.x - sx, s.y - sy);
+    if (dist <= bd) { bd = dist; best = m; }
+  }
+  return best;
+}
+
+cv.addEventListener("pointerdown", e => {
+  cv.setPointerCapture(e.pointerId);
+  const p = localXY(e);
+  pointers.set(e.pointerId, p);
+
+  // Pinch-zoom : 2 doigts -> on bascule en navigation
+  if (pointers.size === 2) { drag = { kind: "pinch", start: pinchState() }; clearLong(); return; }
+
+  // Bouton droit / milieu = pan (souris) ou verrouillage cible
+  if (e.button === 2) { return; } // géré par contextmenu
+
+  const world = screenToWorld(p.x, p.y);
+  const hitMarker = findMarkerAt(p.x, p.y);
+
+  // appui long (tactile) = verrouiller la cible
+  if (e.pointerType === "touch") {
+    clearLong();
+    longPressTimer = setTimeout(() => {
+      if (hitMarker) { toggleLock(hitMarker.id); drag = null; }
+    }, 550);
+  }
+
+  if (e.button === 1) { drag = { kind: "pan", last: p }; return; } // molette enfoncée
+
+  switch (state.mode) {
+    case "nav":
+      drag = { kind: "pan", last: p };
+      break;
+    case "mark":
+      if (hitMarker) { drag = { kind: "moveMarker", marker: hitMarker, moved: false }; }
+      else { addMarker(world.x, world.y); }
+      break;
+    case "traj":
+      // On peut faire pivoter une cible verrouillée en glissant, sinon on trace.
+      drag = { kind: "drawTraj", start: world, dragged: false };
+      break;
+    case "contour":
+      addContourPoint(world.x, world.y);
+      break;
+    case "grid": {
+      // si un coin existe sous le curseur -> on le déplace, sinon on en ajoute un
+      const ci = findCornerAt(p.x, p.y);
+      if (ci >= 0) { drag = { kind: "moveCorner", index: ci }; }
+      else if (state.grid.corners.length < 4) {
+        state.grid.corners.push({ x: world.x, y: world.y });
+        refreshGridPanel(); persist();
+      }
+      break;
+    }
+  }
+  draw();
+});
+
+function findCornerAt(sx, sy, radius = 14) {
+  let best = -1, bd = radius;
+  state.grid.corners.forEach((p, i) => {
+    const s = worldToScreen(p.x, p.y);
+    const dist = Math.hypot(s.x - sx, s.y - sy);
+    if (dist <= bd) { bd = dist; best = i; }
+  });
+  return best;
+}
+
+cv.addEventListener("pointermove", e => {
+  const p = localXY(e);
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, p);
+
+  if (drag && drag.kind === "pinch") { applyPinch(); return; }
+  if (!drag) return;
+
+  // tout mouvement notable annule l'appui long
+  if (longPressTimer) clearLong();
+
+  const world = screenToWorld(p.x, p.y);
+  switch (drag.kind) {
+    case "pan": {
+      state.view.tx += p.x - drag.last.x;
+      state.view.ty += p.y - drag.last.y;
+      drag.last = p;
+      break;
+    }
+    case "moveMarker": {
+      drag.marker.x = world.x; drag.marker.y = world.y; drag.moved = true;
+      refreshPanels();
+      break;
+    }
+    case "moveCorner": {
+      state.grid.corners[drag.index] = { x: world.x, y: world.y };
+      refreshGridPanel();
+      break;
+    }
+    case "drawTraj": {
+      drag.dragged = true;
+      if (state.lockTargetId != null) {
+        // cible verrouillée : on tourne autour de la cible
+        const tgt = state.markers.find(m => m.id === state.lockTargetId);
+        state.traj.anchor = { x: tgt.x, y: tgt.y };
+        state.traj.angle = Math.atan2(world.y - tgt.y, world.x - tgt.x);
+        state.traj.defined = true;
+        syncAngleSlider();
+      } else {
+        // trajectoire libre : ancre = point de départ, angle = vers le curseur
+        const dx = world.x - drag.start.x, dy = world.y - drag.start.y;
+        if (Math.hypot(dx, dy) > 2) {
+          state.traj.anchor = { x: drag.start.x, y: drag.start.y };
+          state.traj.angle = Math.atan2(dy, dx);
+          state.traj.defined = true;
+        }
+      }
+      refreshPanels();
+      break;
+    }
+  }
+  draw();
+});
+
+function endPointer(e) {
+  clearLong();
+  pointers.delete(e.pointerId);
+  // sauvegarde après un déplacement (marqueur / coin de grille / trajectoire)
+  if (drag && ["moveMarker", "moveCorner", "drawTraj"].includes(drag.kind)) persist();
+  if (drag && drag.kind === "pinch" && pointers.size < 2) drag = null;
+  if (drag && drag.kind !== "pinch") drag = null;
+  try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
+}
+cv.addEventListener("pointerup", endPointer);
+cv.addEventListener("pointercancel", endPointer);
+
+function clearLong() { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; } }
+
+// Clic droit = verrouiller / déverrouiller la cible
+cv.addEventListener("contextmenu", e => {
+  e.preventDefault();
+  const p = localXY(e);
+  const m = findMarkerAt(p.x, p.y);
+  if (m) toggleLock(m.id);
+});
+
+// Molette = zoom centré sur le curseur
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  const p = localXY(e);
+  const before = screenToWorld(p.x, p.y);
+  const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  state.view.scale = Math.max(0.05, Math.min(20, state.view.scale * factor));
+  const after = screenToWorld(p.x, p.y);
+  state.view.tx += (after.x - before.x) * state.view.scale;
+  state.view.ty += (after.y - before.y) * state.view.scale;
+  draw();
+}, { passive: false });
+
+// --- Pinch-zoom tactile ---
+function pinchState() {
+  const pts = [...pointers.values()];
+  const cx = (pts[0].x + pts[1].x) / 2, cy = (pts[0].y + pts[1].y) / 2;
+  const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  return { cx, cy, dist, scale: state.view.scale, tx: state.view.tx, ty: state.view.ty };
+}
+function applyPinch() {
+  if (pointers.size < 2) return;
+  const now = pinchState();
+  const s0 = drag.start;
+  const ratio = now.dist / Math.max(1, s0.dist);
+  // restaure l'état initial puis applique zoom + déplacement du centre
+  state.view.scale = Math.max(0.05, Math.min(20, s0.scale * ratio));
+  const worldCenter = { x: (s0.cx - s0.tx) / s0.scale, y: (s0.cy - s0.ty) / s0.scale };
+  state.view.tx = now.cx - worldCenter.x * state.view.scale;
+  state.view.ty = now.cy - worldCenter.y * state.view.scale;
+  draw();
+}
+
+// ---------------------------------------------------------------
+// 8. ACTIONS SUR LES DONNÉES
+// ---------------------------------------------------------------
+function addMarker(x, y) {
+  const t = TYPES[state.currentType];
+  // snap au centre de tuile si la grille est calibrée + option activée
+  if (state.grid.snap && gridReady()) { const s = snapToGrid({ x, y }); x = s.x; y = s.y; }
+  state.markers.push({ id: nextId++, x, y, type: state.currentType, value: t.value });
+  refreshPanels(); persist();
+}
+function deleteMarker(id) {
+  state.markers = state.markers.filter(m => m.id !== id);
+  if (state.lockTargetId === id) { state.lockTargetId = null; refreshLock(); }
+  refreshPanels(); draw(); persist();
+}
+function addContourPoint(x, y) {
+  // Si on reclique près du 1er point -> ferme le polygone.
+  if (state.contour.length >= 3) {
+    const first = state.contour[0];
+    const s0 = worldToScreen(first.x, first.y);
+    const s = worldToScreen(x, y);
+    if (Math.hypot(s0.x - s.x, s0.y - s.y) < 14) {
+      state.contourClosed = true; refreshPanels(); draw(); persist(); return;
+    }
+  }
+  state.contour.push({ x, y });
+  refreshPanels(); draw(); persist();
+}
+function toggleLock(id) {
+  if (state.lockTargetId === id) {
+    state.lockTargetId = null;
+  } else {
+    state.lockTargetId = id;
+    const m = state.markers.find(mm => mm.id === id);
+    // ancre la trajectoire sur la cible (en gardant l'angle courant)
+    state.traj.anchor = { x: m.x, y: m.y };
+    state.traj.defined = true;
+  }
+  state.optTop = [];
+  refreshLock(); refreshPanels(); draw();
+}
+
+// ---------------------------------------------------------------
+// 9. OPTIMISEUR (V2) — balaye les angles autour de la cible verrouillée
+// ---------------------------------------------------------------
+function optimize() {
+  if (state.lockTargetId == null) return;
+  const tgt = state.markers.find(m => m.id === state.lockTargetId);
+  const anchor = { x: tgt.x, y: tgt.y };
+  const half = state.arrowWidth / 2;
+  const results = [];
+  for (let deg = 0; deg < 180; deg++) {        // 0..179° (la droite est symétrique)
+    const d = dir(toRad(deg));
+    const hits = state.markers.filter(m => perpDistance(m, anchor, d) <= half);
+    results.push({ deg, score: scoreOf(hits), count: hits.length });
+  }
+  results.sort((a, b) => b.score - a.score || b.count - a.count);
+  // garde le top 3 en évitant les angles trop proches (< 6°)
+  const top = [];
+  for (const r of results) {
+    if (top.every(t => Math.abs(t.deg - r.deg) >= 6)) top.push(r);
+    if (top.length === 3) break;
+  }
+  state.optTop = top;
+  refreshLock();
+}
+function applyOptResult(deg) {
+  const tgt = state.markers.find(m => m.id === state.lockTargetId);
+  state.traj.anchor = { x: tgt.x, y: tgt.y };
+  state.traj.angle = toRad(deg);
+  state.traj.defined = true;
+  syncAngleSlider();
+  refreshPanels(); draw();
+}
+
+// ---------------------------------------------------------------
+// 10. MISE À JOUR DES PANNEAUX
+// ---------------------------------------------------------------
+function refreshPanels() {
+  refreshScore();
+  refreshHitList();
+  refreshDeploy();
+  refreshMarkerList();
+  draw();
+}
+function refreshScore() {
+  const hits = computeHits();
+  document.getElementById("scoreVal").textContent = scoreOf(hits);
+  document.getElementById("scoreSub").textContent = state.traj.defined
+    ? `${hits.length} bâtiment(s) touché(s) · angle ${normDeg(toDeg(state.traj.angle)).toFixed(0)}°`
+    : "Aucune trajectoire tracée";
+}
+function refreshHitList() {
+  const hits = computeHits();
+  const ul = document.getElementById("hitList");
+  if (hits.length === 0) { ul.innerHTML = '<li class="empty">Aucun bâtiment dans la bande</li>'; return; }
+  ul.innerHTML = "";
+  hits.forEach(m => {
+    const t = TYPES[m.type];
+    const li = document.createElement("li");
+    const eff = m.value * t.dmgMult;
+    li.innerHTML = `<span class="dot" style="background:${t.color}"></span>
+      <span class="grow">${t.label}</span>
+      ${t.dmgMult > 1 ? '<span class="tag">×2</span>' : ''}
+      <b>${eff}</b>`;
+    ul.appendChild(li);
+  });
+}
+function refreshDeploy() {
+  const box = document.getElementById("deployBox");
+  const dps = computeDeployPoints();
+  if (dps.length < 2) {
+    box.innerHTML = '<span class="empty">Trace un contour de base fermé + une trajectoire.</span>';
+    return;
+  }
+  box.innerHTML = dps.map(dp => `
+    <div class="deploy">
+      <b>Déployer côté ${dp.label}</b><br>
+      Position (px image) : ${dp.pt.x.toFixed(0)}, ${dp.pt.y.toFixed(0)}<br>
+      Angle de tir : <b>${dp.angleDeg.toFixed(0)}°</b>
+    </div>`).join("");
+}
+function refreshMarkerList() {
+  document.getElementById("markerCount").textContent = state.markers.length;
+  const ul = document.getElementById("markerList");
+  if (state.markers.length === 0) { ul.innerHTML = '<li class="empty">Aucun marqueur</li>'; return; }
+  ul.innerHTML = "";
+  state.markers.forEach(m => {
+    const li = document.createElement("li");
+    const t = TYPES[m.type];
+    // sélecteur de type
+    const sel = document.createElement("select");
+    Object.entries(TYPES).forEach(([k, v]) => {
+      const o = document.createElement("option");
+      o.value = k; o.textContent = v.label; if (k === m.type) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = () => { m.type = sel.value; m.value = TYPES[sel.value].value; refreshPanels(); persist(); };
+    // valeur éditable
+    const val = document.createElement("input");
+    val.type = "number"; val.value = m.value; val.min = 0; val.step = 1;
+    val.onchange = () => { m.value = parseFloat(val.value) || 0; refreshPanels(); persist(); };
+    // bouton verrou + supprimer
+    const lock = document.createElement("button");
+    lock.className = "mini"; lock.textContent = m.id === state.lockTargetId ? "🔒" : "🔓";
+    lock.title = "Verrouiller comme cible"; lock.onclick = () => toggleLock(m.id);
+    const del = document.createElement("button");
+    del.className = "mini"; del.textContent = "✕"; del.title = "Supprimer"; del.onclick = () => deleteMarker(m.id);
+
+    const dot = document.createElement("span"); dot.className = "dot"; dot.style.background = t.color;
+    li.appendChild(dot); li.appendChild(sel); li.appendChild(val); li.appendChild(lock); li.appendChild(del);
+    ul.appendChild(li);
+  });
+}
+function refreshLock() {
+  const box = document.getElementById("lockBox");
+  const ctrl = document.getElementById("lockControls");
+  if (state.lockTargetId == null) {
+    box.innerHTML = '<span class="empty">Clic droit (ou appui long) sur un marqueur pour le verrouiller.</span>';
+    ctrl.classList.add("hidden");
+    document.getElementById("optResults").innerHTML = "";
+    return;
+  }
+  const m = state.markers.find(mm => mm.id === state.lockTargetId);
+  const t = TYPES[m.type];
+  box.innerHTML = `<div class="row"><span><span class="dot" style="background:${t.color};display:inline-block;vertical-align:middle"></span>
+    <b>${t.label}</b> <span class="tag lock">VERROUILLÉ</span></span>
+    <button class="mini" id="unlockBtn" title="Déverrouiller">✕</button></div>`;
+  document.getElementById("unlockBtn").onclick = () => toggleLock(m.id);
+  ctrl.classList.remove("hidden");
+  syncAngleSlider();
+  // résultats optimiseur
+  const res = document.getElementById("optResults");
+  if (state.optTop.length) {
+    res.innerHTML = '<h3 style="margin-top:10px">Top 3 trajectoires</h3>' + state.optTop.map((r, i) => `
+      <div class="opt-result" data-deg="${r.deg}">
+        <div><b>#${i + 1}</b> · angle <b>${r.deg}°</b> &nbsp; <span class="big">${r.score}</span> pts</div>
+        <div class="score-sub">${r.count} bâtiment(s) touché(s)</div>
+      </div>`).join("");
+    res.querySelectorAll(".opt-result").forEach(el =>
+      el.onclick = () => applyOptResult(parseInt(el.dataset.deg, 10)));
+  } else {
+    res.innerHTML = "";
+  }
+}
+function syncAngleSlider() {
+  const slider = document.getElementById("angleSlider");
+  const deg = Math.round(normDeg(toDeg(state.traj.angle)));
+  slider.value = deg;
+  document.getElementById("angleVal").textContent = deg + "°";
+}
+
+// ---------------------------------------------------------------
+// 11. UI : boutons, modes, sliders
+// ---------------------------------------------------------------
+function setMode(mode) {
+  state.mode = mode;
+  document.querySelectorAll("#modeGroup button").forEach(b =>
+    b.classList.toggle("active", b.dataset.mode === mode));
+  const hints = {
+    nav:     "Naviguer : glisse pour déplacer, molette/pinch pour zoomer.",
+    mark:    "Marquer : clique pour poser un marqueur. Glisse un marqueur pour le déplacer. Clic droit = verrouiller.",
+    traj:    "Trajectoire : clique-glisse pour tracer la flèche. Cible verrouillée = tu pivotes autour d'elle.",
+    contour: "Contour : clique pour ajouter des points. Reclique sur le 1er point pour fermer la base.",
+    grid:    "Grille : clique les 4 coins de la zone jouable (haut, droite, bas, gauche). Glisse un coin pour l'ajuster.",
+  };
+  hintEl.textContent = hints[mode];
+}
+document.querySelectorAll("#modeGroup button").forEach(b =>
+  b.onclick = () => setMode(b.dataset.mode));
+
+// Type-picker
+function buildTypePicker() {
+  const wrap = document.getElementById("typePicker");
+  wrap.innerHTML = "";
+  Object.entries(TYPES).forEach(([k, v]) => {
+    const b = document.createElement("button");
+    b.innerHTML = `<span class="dot" style="background:${v.color}"></span>${v.label}`;
+    b.classList.toggle("active", k === state.currentType);
+    b.onclick = () => {
+      state.currentType = k;
+      buildTypePicker();
+      if (state.mode !== "mark") setMode("mark");
+    };
+    wrap.appendChild(b);
+  });
+}
+
+// --- Calibration grille (V2.8) ---
+function refreshGridPanel() {
+  const n = state.grid.corners.length;
+  const status = document.getElementById("gridStatus");
+  if (gridReady()) status.textContent = `Grille ${state.grid.size}×${state.grid.size} calibrée ✓`;
+  else if (n > 0) status.textContent = `Placement : ${n}/4 coin(s)…`;
+  else status.textContent = "Grille non calibrée.";
+  draw();
+}
+document.getElementById("gridSize").onchange = (e) => {
+  state.grid.size = Math.max(2, Math.min(100, parseInt(e.target.value, 10) || 44));
+  e.target.value = state.grid.size;
+  refreshGridPanel(); persist();
+};
+document.getElementById("btnGridMode").onclick = () => {
+  state.grid.corners = [];          // recommence le placement à zéro
+  setMode("grid"); refreshGridPanel();
+};
+document.getElementById("gridShow").onchange = (e) => { state.grid.show = e.target.checked; draw(); persist(); };
+document.getElementById("gridSnap").onchange = (e) => { state.grid.snap = e.target.checked; persist(); };
+document.getElementById("btnGridResnap").onclick = () => {
+  if (!gridReady()) { alert("Calibre d'abord la grille (4 coins)."); return; }
+  state.markers.forEach(m => { const s = snapToGrid(m); m.x = s.x; m.y = s.y; });
+  refreshPanels(); persist();
+};
+document.getElementById("btnGridClear").onclick = () => {
+  state.grid.corners = []; refreshGridPanel(); persist();
+};
+
+// Sliders largeur / opacité
+const widthSlider = document.getElementById("width");
+widthSlider.oninput = () => {
+  state.arrowWidth = parseInt(widthSlider.value, 10);
+  document.getElementById("widthVal").textContent = state.arrowWidth + "px";
+  refreshPanels(); persist();
+};
+const opacitySlider = document.getElementById("opacity");
+opacitySlider.oninput = () => { state.bandOpacity = parseInt(opacitySlider.value, 10) / 100; draw(); persist(); };
+
+// Slider d'angle (cible verrouillée)
+document.getElementById("angleSlider").oninput = (e) => {
+  if (state.lockTargetId == null) return;
+  const tgt = state.markers.find(m => m.id === state.lockTargetId);
+  state.traj.anchor = { x: tgt.x, y: tgt.y };
+  state.traj.angle = toRad(parseInt(e.target.value, 10));
+  state.traj.defined = true;
+  document.getElementById("angleVal").textContent = e.target.value + "°";
+  refreshPanels();
+};
+document.getElementById("btnOptimize").onclick = optimize;
+
+// Chargement d'image
+document.getElementById("btnLoad").onclick = () => document.getElementById("fileInput").click();
+document.getElementById("fileInput").onchange = (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => { state.img = img; fitImage(); draw(); URL.revokeObjectURL(url); };
+  img.src = url;
+};
+
+// Réinitialiser
+document.getElementById("btnReset").onclick = () => {
+  if (!confirm("Tout réinitialiser (marqueurs, contour, trajectoire) ?")) return;
+  state.markers = []; state.contour = []; state.contourClosed = false;
+  state.traj = { defined: false, anchor: null, angle: 0 };
+  state.lockTargetId = null; state.optTop = [];
+  state.grid.corners = [];
+  refreshLock(); refreshPanels(); refreshGridPanel(); persist();
+};
+
+// Export JSON
+document.getElementById("btnExport").onclick = () => {
+  const data = {
+    version: 1,
+    markers: state.markers,
+    contour: state.contour,
+    contourClosed: state.contourClosed,
+    arrowWidth: state.arrowWidth,
+    traj: state.traj,
+    lockTargetId: state.lockTargetId,
+    grid: state.grid,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "fleche-geante-session.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+// Import JSON
+document.getElementById("btnImport").onclick = () => document.getElementById("importInput").click();
+document.getElementById("importInput").onchange = (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { loadData(JSON.parse(reader.result)); }
+    catch (err) { alert("Fichier JSON invalide : " + err.message); }
+  };
+  reader.readAsText(file);
+};
+function loadData(d) {
+  state.markers = (d.markers || []).map(m => ({ ...m }));
+  state.contour = d.contour || [];
+  state.contourClosed = !!d.contourClosed;
+  state.arrowWidth = d.arrowWidth || 40;
+  state.traj = d.traj || { defined: false, anchor: null, angle: 0 };
+  state.lockTargetId = d.lockTargetId ?? null;
+  state.grid = Object.assign({ corners: [], size: 44, show: true, snap: false }, d.grid || {});
+  nextId = state.markers.reduce((mx, m) => Math.max(mx, m.id), 0) + 1;
+  widthSlider.value = state.arrowWidth;
+  document.getElementById("widthVal").textContent = state.arrowWidth + "px";
+  // resynchronise les contrôles de la grille
+  document.getElementById("gridSize").value = state.grid.size;
+  document.getElementById("gridShow").checked = state.grid.show;
+  document.getElementById("gridSnap").checked = state.grid.snap;
+  refreshLock(); refreshPanels(); refreshGridPanel(); persist();
+}
+
+// ---------------------------------------------------------------
+// 12. PERSISTANCE LOCALE (best-effort, avec garde-fou)
+//     -> si localStorage est interdit, on échoue silencieusement ;
+//        l'export/import JSON reste le moyen fiable de sauvegarde.
+// ---------------------------------------------------------------
+const LS_KEY = "giantArrowSession";
+function persist() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      markers: state.markers, contour: state.contour, contourClosed: state.contourClosed,
+      arrowWidth: state.arrowWidth, traj: state.traj, lockTargetId: state.lockTargetId,
+      grid: state.grid,
+    }));
+  } catch (_) { /* environnement sans localStorage : on ignore */ }
+}
+function restore() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) loadData(JSON.parse(raw));
+  } catch (_) {}
+}
+
+// ---------------------------------------------------------------
+// 13. INITIALISATION
+// ---------------------------------------------------------------
+buildTypePicker();
+setMode("nav");
+restore();
+resizeCanvas();
+refreshLock();
+refreshPanels();
+refreshGridPanel();
+</script>
+</body>
+</html>
